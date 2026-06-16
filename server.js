@@ -1,35 +1,55 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { WebcastPushConnection } = require('tiktok-live-connector');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-require('dotenv').config();
+const { WebcastPushConnection } = require('@someuser/tiktok-live-connector');
+const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialize Gemini API (2026 SDK)
+const ai = new GoogleGenAI({ apiKey: "YOUR_GEMINI_API_KEY" });
+
+app.use(express.static('public'));
 
 io.on('connection', (socket) => {
-    socket.on('set-username', (username) => {
-        console.log('Connecting to: ' + username);
-        const tiktokLiveConnection = new WebcastPushConnection(username);
-        
-        tiktokLiveConnection.on('chat', async (data) => {
+    console.log('Client connected to backend server');
+
+    socket.on('start-live', (username) => {
+        let tiktokConnection = new WebcastPushConnection(username);
+
+        // 1. Welcome new members joining the live
+        tiktokConnection.on('member', async (data) => {
             try {
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                const result = await model.generateContent('Reply briefly to: ' + data.comment);
-                io.emit('bot-reply', { user: data.uniqueId, text: result.response.text() });
-            } catch (error) {
-                console.error("AI Error:", error);
-            }
+                const response = await ai.models.generateContent({
+                    model: 'gemini-1.5-flash',
+                    contents: Welcome the new viewer named ${data.uniqueId} with a very short, friendly welcome phrase suitable for a gaming stream. Detect their language and reply in Arabic or English accordingly.,
+                });
+                socket.emit('ai-response', { text: response.text, type: 'welcome' });
+            } catch (err) { console.error(err); }
         });
 
-        tiktokLiveConnection.connect().catch(err => console.log(err));
+        // 2. Reply to chat comments
+        tiktokConnection.on('chat', async (data) => {
+            try {
+                const response = await ai.models.generateContent({
+                    model: 'gemini-1.5-flash',
+                    contents: data.comment,
+                    config: {
+                        systemInstruction: "You are a friendly and fun live gaming stream assistant. Reply to the user comments. Your response must be extremely short (maximum one sentence) and written in the exact same language as the user comment (Arabic or English)."
+                    }
+                });
+                socket.emit('ai-response', { text: response.text, type: 'chat' });
+            } catch (err) { console.error(err); }
+        });
+
+        tiktokConnection.connect().then(() => {
+            socket.emit('status', 'Connected to TikTok Live successfully!');
+        }).catch(() => {
+            socket.emit('status', 'Connection failed. Make sure you are currently LIVE.');
+        });
     });
 });
 
-server.listen(process.env.PORT || 3000, () => {
-    console.log('Server is running on port 3000');
-});
+server.listen(3000, () => console.log('Server is running on port 3000'));
