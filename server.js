@@ -13,7 +13,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 io.on('connection', (socket) => {
     socket.on('set-username', (username) => {
-        console.log(`connectin to: ${username}`);
+        console.log(`Connecting to: ${username}`);
         const tiktokLiveConnection = new WebcastPushConnection(username);
         
         tiktokLiveConnection.on('chat', async (data) => {
