@@ -13,13 +13,15 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 io.on('connection', (socket) => {
     socket.on('set-username', (username) => {
-        console.log(`Connecting to: ${username}`);
+        // الطريقة البديلة: ربط النص بالمتغير باستخدام علامة +
+        console.log('Connecting to: ' + username);
         const tiktokLiveConnection = new WebcastPushConnection(username);
         
         tiktokLiveConnection.on('chat', async (data) => {
             try {
                 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                const result = await model.generateContent(Reply briefly to: ${data.comment});
+                // الطريقة البديلة: ربط النص بالمتغير باستخدام علامة +
+                const result = await model.generateContent('Reply briefly to: ' + data.comment);
                 io.emit('bot-reply', { user: data.uniqueId, text: result.response.text() });
             } catch (error) {
                 console.error("AI Error:", error);
